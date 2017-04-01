@@ -12,14 +12,13 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 # the top of that project's global settings.
 IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_LIST_DIR})
   IF(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    # This logic does not apply to multi-configuration generators (MSVC
-    # and Xcode) where the build configuration is specified in the build step
-    # (--config Release). CMAKE_BUILD_TYPE is ignored in those generators.
-    IF(NOT MSVC AND NOT XCODE)
+    # Visual Studio and Xcode do not use CMAKE_BUILD_TYPE, it is ignored in those
+    # multi-configuration generators.
+    IF(NOT CMAKE_GENERATOR MATCHES "Visual Studio" AND NOT CMAKE_GENERATOR MATCHES "Xcode")
       MESSAGE(STATUS "Setting CMAKE_BUILD_TYPE type to 'Debug' as none was specified.")
       SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build.")
       SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
-    ENDIF(NOT MSVC AND NOT XCODE)
+    ENDIF(NOT CMAKE_GENERATOR MATCHES "Visual Studio" AND NOT CMAKE_GENERATOR MATCHES "Xcode")
   ENDIF()
 
   PROJECT(portaudio)
@@ -360,9 +359,9 @@ OPTION(PA_BUILD_STATIC "Build static library" ON)
 OPTION(PA_BUILD_SHARED "Build shared/dynamic library" ON)
 
 IF(MINGW)
-  OPTION(PA_LIBNAME_NO_AFFIX "Do not add affix to libraries" ON)
+  OPTION(PA_LIBNAME_NO_AFFIX "Do not add affix to library names" ON)
 ELSE(MINGW)
-  OPTION(PA_LIBNAME_NO_AFFIX "Do not add affix to libraries" OFF)
+  OPTION(PA_LIBNAME_NO_AFFIX "Do not add affix to library names" OFF)
 ENDIF(MINGW)
 # MSVC: if PA_LIBNAME_NO_AFFIX is used, and both static and shared libraries are
 # built, one, of import- and static libraries, will overwrite the other. In
@@ -436,7 +435,12 @@ ELSE()
     INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/portaudio-2.0.pc DESTINATION lib/pkgconfig)
     INSTALL(FILES ${PA_PUBLIC_INCLUDES} DESTINATION include)
     if(NOT MINGW)
-      INSTALL(TARGETS portaudio DESTINATION lib)
+      IF(PA_BUILD_SHARED)
+        INSTALL(TARGETS portaudio DESTINATION lib)
+      ENDIF(PA_BUILD_SHARED)
+      IF(PA_BUILD_STATIC)
+        INSTALL(TARGETS portaudio_static DESTINATION lib)
+      ENDIF(PA_BUILD_STATIC)
     else(NOT MINGW)
       # For MinGW the destination for dll vs dll.a and .a needs to be specified separartely, also
       # there are two targets (shared and static)
@@ -450,7 +454,7 @@ ELSE()
           ARCHIVE DESTINATION lib)
       ENDIF(PA_BUILD_STATIC)
       # installing to default application-location creates an error (a privileges and/or path syntax problem)
-      # plainly overriding CMAKE_PREFIX_PATH requires FORCE and thus prevents the user from being able to 
+      # plainly overriding CMAKE_PREFIX_PATH requires FORCE and thus prevents the user from being able to
       # override the install path from the command line
       GET_FILENAME_COMPONENT(MINGW_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
       GET_FILENAME_COMPONENT(MINGW_SYSROOT ${MINGW_BIN_DIR} DIRECTORY)
